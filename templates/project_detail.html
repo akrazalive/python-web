@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Back Button -->
+    <div class="mb-6">
+        <a href="{{ url_for('projects') }}" class="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Projects
+        </a>
+    </div>
+
+    <!-- Project Detail Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <!-- Project Image -->
+        <div class="relative h-96 bg-gray-100">
+            <img src="{{ url_for('static', filename='uploads/' + project.image_file) }}" 
+                 alt="{{ project.title }}"
+                 class="w-full h-full object-cover"
+                 onerror="this.src='https://placehold.co/1200x800/3b82f6/white?text={{ project.title|urlencode }}'">
+            
+            {% if project.featured %}
+            <div class="absolute top-6 right-6 bg-amber-400 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center shadow-lg">
+                <i class="fas fa-star mr-2"></i> Featured Project
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Project Content -->
+        <div class="p-8">
+            <!-- Title and Category -->
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ project.title }}</h1>
+                    <div class="flex items-center space-x-4">
+                        <span class="px-4 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+                            {{ project.category|title }}
+                        </span>
+                        <span class="text-sm text-gray-500">
+                            <i class="far fa-calendar mr-1"></i> 
+                            Posted: {{ project.created_at.strftime('%B %d, %Y') }}
+                        </span>
+                    </div>
+                </div>
+                
+                <span class="px-4 py-2 rounded-lg text-sm font-semibold
+                    {% if project.status == 'active' %}bg-green-100 text-green-700
+                    {% elif project.status == 'completed' %}bg-blue-100 text-blue-700
+                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                    <i class="fas fa-circle mr-1 text-xs"></i>
+                    {{ project.status|title }}
+                </span>
+            </div>
+            
+            <!-- Description -->
+            <div class="prose prose-lg max-w-none mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Project Description</h2>
+                <p class="text-gray-700 leading-relaxed">{{ project.description }}</p>
+            </div>
+            
+            <!-- Project Details Grid -->
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
+                {% if project.client %}
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 mb-1">Client</p>
+                    <p class="font-semibold text-gray-900">{{ project.client }}</p>
+                </div>
+                {% endif %}
+                
+                {% if project.completion_date %}
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 mb-1">Completion Date</p>
+                    <p class="font-semibold text-gray-900">
+                        {{ project.completion_date.strftime('%B %Y') if project.completion_date is not string else project.completion_date }}
+                    </p>
+                </div>
+                {% endif %}
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 mb-1">Project Author</p>
+                    <p class="font-semibold text-gray-900">{{ project.author.username }}</p>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 mb-1">Last Updated</p>
+                    <p class="font-semibold text-gray-900">{{ project.updated_at.strftime('%B %d, %Y') }}</p>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+                {% if project.project_url %}
+                <a href="{{ project.project_url }}" target="_blank" 
+                   class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-external-link-alt mr-2"></i> View Live Project
+                </a>
+                {% endif %}
+                
+                {% if current_user.is_authenticated and (current_user.id == project.user_id or current_user.is_admin) %}
+                <a href="{{ url_for('edit_project', project_id=project.id) }}" 
+                   class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                    <i class="fas fa-edit mr-2"></i> Edit Project
+                </a>
+                {% endif %}
+                
+                <button onclick="window.print()" 
+                        class="inline-flex items-center px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-print mr-2"></i> Print Details
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Related Projects Section (optional) -->
+   <!-- Add this at the bottom of project_detail.html, before the endblock -->
+{% if related_projects %}
+<div class="mt-12">
+    <h2 class="text-2xl font-bold text-gray-900 mb-6">More Projects</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+        {% for related in related_projects %}
+        <a href="{{ url_for('project_detail', project_id=related.id) }}" class="group">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                <img src="{{ url_for('static', filename='uploads/' + related.image_file) }}" 
+                     alt="{{ related.title }}"
+                     class="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300">
+                <div class="p-4">
+                    <h3 class="font-semibold text-gray-900 group-hover:text-blue-600">{{ related.title }}</h3>
+                    <p class="text-sm text-gray-500">{{ related.category|title }}</p>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

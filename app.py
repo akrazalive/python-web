@@ -157,9 +157,9 @@ class ProjectForm(FlaskForm):
         ('consulting', 'Consulting'),
         ('other', 'Other')
     ], validators=[DataRequired()])
-    client = StringField('Client Name', Length(max=200))
+    client = StringField('Client Name', validators=[Length(max=200)])
     completion_date = StringField('Completion Date (YYYY-MM-DD)')
-    project_url = StringField('Project URL', Length(max=500))
+    project_url = StringField('Project URL', validators=[Length(max=500)])
     featured = BooleanField('Featured Project')
     status = SelectField('Status', choices=[
         ('active', 'Active'),
@@ -258,11 +258,6 @@ def projects():
                          categories=categories,
                          current_category=category)
 
-@app.route('/project/<int:project_id>')
-def project_detail(project_id):
-    """Project detail page"""
-    project = Project.query.get_or_404(project_id)
-    return render_template('project_detail.html', title=project.title, project=project)
 
 # ============================================================================
 # ROUTES - AUTHENTICATION
@@ -334,6 +329,22 @@ def dashboard():
                          title='Dashboard',
                          projects=user_projects)
 
+
+@app.route('/project/<int:project_id>')
+def project_detail(project_id):
+    """Project detail page"""
+    project = Project.query.get_or_404(project_id)
+    # Get related projects (same category, excluding current)
+    related_projects = Project.query.filter(
+        Project.category == project.category,
+        Project.id != project.id,
+        Project.status == 'active'
+    ).limit(3).all()
+    return render_template('project_detail.html', 
+                         title=project.title, 
+                         project=project,
+                         related_projects=related_projects)
+
 @app.route('/dashboard/projects/new', methods=['GET', 'POST'])
 @login_required
 def new_project():
@@ -351,6 +362,14 @@ def new_project():
             status=form.status.data,
             user_id=current_user.id
         )
+
+        # FIX: Handle completion date for new projects
+        completion_date = request.form.get('completion_date')
+        if completion_date:
+            try:
+                project.completion_date = datetime.strptime(completion_date, '%Y-%m-%d').date()
+            except:
+                project.completion_date = None
         
         # Handle image upload
         if 'image' in request.files:
@@ -387,6 +406,13 @@ def edit_project(project_id):
         project.project_url = form.project_url.data
         project.featured = form.featured.data
         project.status = form.status.data
+
+        completion_date = request.form.get('completion_date')
+        if completion_date:
+            try:
+                project.completion_date = datetime.strptime(completion_date, '%Y-%m-%d').date()
+            except:
+                project.completion_date = None
         
         # Handle image upload
         if 'image' in request.files:
@@ -414,6 +440,10 @@ def edit_project(project_id):
         form.project_url.data = project.project_url
         form.featured.data = project.featured
         form.status.data = project.status
+        form.completion_date.data = project.completion_date.strftime('%Y-%m-%d') if project.completion_date else ''
+
+    print(f"Rendering edit_project.html with project: {project.title}")
+    print(f"Template folder: {app.template_folder}")    
     
     return render_template('edit_project.html', title='Edit Project', form=form, project=project)
 
@@ -452,6 +482,8 @@ def admin_dashboard():
     
     total_users = User.query.count()
     total_projects = Project.query.count()
+    # Get all users for the admins count
+    users = User.query.all()
     recent_projects = Project.query.order_by(Project.created_at.desc()).limit(5).all()
     recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     
@@ -459,6 +491,7 @@ def admin_dashboard():
                          title='Admin Dashboard',
                          total_users=total_users,
                          total_projects=total_projects,
+                         users=users,  # Add this line
                          recent_projects=recent_projects,
                          recent_users=recent_users)
 
