@@ -17,6 +17,10 @@ from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextA
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from ai_tools.job_project_generator import JobToProjectGenerator
+
+# Store generated projects in session (temporary)
+from flask import session
 import psycopg2
 
 # Load environment variables
@@ -29,7 +33,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
 # Database configuration - AWS PostgreSQL
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://username:password@host:5432/database')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Upload configuration
@@ -591,6 +595,80 @@ def toggle_admin(user_id):
         flash(f'Admin status for {user.username} has been updated!', 'success')
     
     return redirect(url_for('admin_users'))
+
+
+
+
+
+@app.route('/admin/job-to-project', methods=['GET', 'POST'])
+@login_required
+def job_to_project():
+    """AI ENGINEER: Job description to project generator"""
+    if not current_user.is_admin:
+        abort(403)
+    
+    if request.method == 'POST':
+        job_description = request.form.get('job_description')
+        num_projects = int(request.form.get('num_projects', 3))
+        
+        # Generate projects using AI
+        generator = JobToProjectGenerator()
+        projects = generator.generate_projects_from_job(job_description, num_projects)
+        
+        # Store in session temporarily
+        session['generated_projects'] = projects
+        session['job_description'] = job_description
+        
+        return render_template('admin/job_to_project.html', 
+                             generated_projects=projects,
+                             job_description=job_description)
+    
+    return render_template('admin/job_to_project.html')
+
+@app.route('/admin/save-generated-projects', methods=['POST'])
+@login_required
+def save_generated_projects():
+    """Save selected AI-generated projects to database"""
+    if not current_user.is_admin:
+        abort(403)
+    
+    selected_indices = request.form.getlist('selected_projects')
+    generated_projects = session.get('generated_projects', [])
+    
+    saved_count = 0
+    for index in selected_indices:
+        index = int(index)
+        if index < len(generated_projects):
+            project_data = generated_projects[index]
+            
+            # Create new project in database
+            project = Project(
+                title=project_data['title'],
+                description=project_data['description'],
+                category=project_data['category'],
+                client=project_data.get('client', 'AI Generated Client'),
+                status='active',
+                user_id=current_user.id,
+                image_file='default.jpg'  # You can add image generation later!
+            )
+            
+            db.session.add(project)
+            saved_count += 1
+    
+    db.session.commit()
+    
+    flash(f'Successfully saved {saved_count} projects to your portfolio!', 'success')
+    
+    # Clear session data
+    session.pop('generated_projects', None)
+    session.pop('job_description', None)
+    
+    return redirect(url_for('admin_projects'))
+
+# Add to admin menu - update your admin dashboard template
+
+
+
 
 # ============================================================================
 # DATABASE INITIALIZATION

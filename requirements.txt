@@ -8,3 +8,6 @@ psycopg2-binary==2.9.9
 werkzeug==2.3.0
 email-validator==2.1.0
 Pillow==10.1.0  # For image handling
+# Add these
+openai==0.28.0
+langchain==0.1.0
